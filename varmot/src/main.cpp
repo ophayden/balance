@@ -19,10 +19,10 @@ void setup(){
   TCNT2 = 0;
   TCCR2A = 0;
   TCCR2B = 0;
-  TCCR2A |= 0b00000010;
-  TCCR2B |= 0b00000010;
-  TIMSK2 |= 0b00000010;
-  OCR2A = 40;
+  TCCR2A |= (1 << WGM21);
+  TCCR2B |= (1 << CS21);
+  TIMSK2 |= (1 << OCIE2A);
+  OCR2A = 39;
   //sei();
 }
 
@@ -40,14 +40,14 @@ ISR(TIMER2_COMPA_vect){
     count = 0;
     pulsememl = period;
     if(pulsememl < 0){ 
-      PORTD &= (0 << dir_pin); 
+      PORTD &= 0b11110111; 
       pulsememl *= -1;   
     }
-    else PORTD |= (1 << dir_pin); 
+    else PORTD |= 0b00001000; 
   }
 
-  else if(count == 1)PORTD |= (1 << step_pin);
-  else if(count == 2)PORTD &= (0 << step_pin);
+  else if(count == 1)PORTD |= 0b00000100;
+  else if(count == 2)PORTD &= 0b11111011;
   
   
 }
