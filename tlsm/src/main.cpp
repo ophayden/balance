@@ -59,7 +59,7 @@ Wire.endTransmission();
 Wire.requestFrom(lsm, 2);
 const int raxl = Wire.read();
 const int raxh = Wire.read();
-const int ax_value = (raxh << 8) | raxl;
+int16_t ax_value = (raxh << 8) | raxl;
 
 Serial.println(ax_value);
 delay(500);

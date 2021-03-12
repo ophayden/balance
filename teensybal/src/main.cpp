@@ -2,57 +2,33 @@
 
 #include <math.h>
 #include <Wire.h>
+#include <regsNpins.h>
+
 IntervalTimer myTimer;
 void myISR();
-// CONFIG
-// comment this out to stop interrupts. This makes loop be called as fast as
-// possible.
-//#define NOINTERRUPT
+
 
 // Number of samples taken to calibrate the gyroscope
-const int n_samples = 200;
+const int n_samples = 1000;
 
-// If the angle offset from center is greater than this, then start balancing
+// If the angle is whithin this window, then start balancing
 const double balance_window = 0.5;
 
 // microseconds before next pid tick
 const int loop_time_length = 4000;
-//const int step_pinl=2, dir_pinl=3, step_pinr=4, dir_pinr=5;
 
 // pid params
-constexpr double pgain = 3;//15;
-constexpr double igain = 0;//1.5; 
-constexpr double dgain = 0;//10;
+constexpr double pgain = 50;//15;
+constexpr double igain = 5;//.5;//1.5; 
+constexpr double dgain = -35;//45;//10;
 
-// END OF CONFIG
-#define step_pin_l 2
-#define dir_pin_l 3
-#define step_pin_r 4
-#define dir_pin_r 5
-// REGISTER PORTS
-#define lsm 0x6B
-#define LED_PIN 13
-#define BOD_RATE 9600
-#define CTRL_REG1_G 0x10
+//moving average filter setup
+const int points = 1;
+int readArray[points];
+int sum = 0, movingAvg = 0, readIndex = 0;
 
-#define axl 0x28
-#define axh 0x29
-#define ayl 0x2A
-#define ayh 0x2B
-#define azl 0x2C
-#define azh 0x2D
-
-#define gxl 0x18
-#define gxh 0x19
-#define gyl 0x1A
-#define gyh 0x1B
-#define gzl 0x1C
-#define gzh 0x1D
-
-#define whoami 0xF0
-
-// wheel radius
-// r = 204.2mm
+const int serialSpacer = 100;
+int serialCounter = 0; 
 
 // UTIL
 constexpr double to_deg = 180.0 / M_PI;
@@ -75,13 +51,13 @@ double calc_mot(double output);
 
 void setup(){  ////////////////////////////////////////////////////////////////////////
   Serial.begin(9600);
+  Serial1.begin(9600);
   Wire.begin();
   myTimer.begin(myISR,20);
   // set i2c clock frequency
-  TWBR = 12;
+  //TWBR = 12;
 
-  // pinMode 2, 3, 4, 5 set to OUTPUT
-  // pinMode 13 set to OUTPUT
+  
   pinMode(2, OUTPUT);
   pinMode(3, OUTPUT);
   pinMode(4, OUTPUT);
@@ -116,19 +92,17 @@ void setup(){  /////////////////////////////////////////////////////////////////
   y_g_calibration /= n_samples;
   loop_time = micros() + 4000;
 
-  // timer registers
-  // #ifndef NOINTERRUPT
-  // TCNT2 = 0;
-  // TCCR2A = 0;
-  // TCCR2B = 0;
-  // TCCR2A |= (1 << WGM21);
-  // TCCR2B |= (1 << CS21);
-  // TIMSK2 |= (1 << OCIE2A);
-  // OCR2A = 39;
-  // #endif
+  for (int i=0; i < points; i++){
+    readArray[i] =0;
+  }
 }
 
 void loop(){ //////////////////////////////////////////////////////////////////////
+  if(serialCounter >= serialSpacer){
+    serialCounter = 0;
+  }
+  serialCounter++;
+
   PORTD &= ~(1<<7);
   if (loop_time > micros())
     return;
@@ -141,8 +115,8 @@ void loop(){ ///////////////////////////////////////////////////////////////////
   Wire.requestFrom(lsm, 2);
   const int raxl = Wire.read();
   const int raxh = Wire.read();
-  const int ax_value = (raxh << 8) | raxl;
-
+  int16_t ax_value = (raxh << 8) | raxl;
+  //Serial.println(ax_value);
   double ax = -ax_value/8200.0;
   if (ax > 1.0) {
     ax = 1.0;
@@ -151,6 +125,8 @@ void loop(){ ///////////////////////////////////////////////////////////////////
   {
     ax = -1.0;
   }
+  Serial1.println(ax);
+  Serial1.print(serialCounter); 
 
   // read from gyroscope
   Wire.beginTransmission(lsm);
@@ -159,10 +135,13 @@ void loop(){ ///////////////////////////////////////////////////////////////////
   Wire.requestFrom(lsm, 2);
   const int rgyl = Wire.read();
   const int rgyh = Wire.read();
-  const int gy_value = (rgyh << 8) | rgyl;
+  int16_t gy_value = (rgyh << 8) | rgyl;
 
   double gy = gy_value - y_g_calibration;
 
+  /*for(i=0; i<9; i++)){
+    
+  }
   /*
   Serial.println(ax);
   Serial.println(gy);
@@ -180,10 +159,22 @@ void loop(){ ///////////////////////////////////////////////////////////////////
 
   gangle += gy * 0.000031;
   gangle = gangle * 0.9996 + aangle * 0.0004;
-  //gangle = aangle;
 
+  //implement moving average
+  sum = sum - readArray[readIndex];
+  readArray[readIndex] = gangle;
+  sum = sum + readArray[readIndex];
+  readIndex = readIndex + 1;
+  if(readIndex >= points){
+    readIndex = 0;
+  }
+  movingAvg = sum/points;
+
+
+  double usedAngle = gangle;
+  //double usedAngle = movingAvg;
   //pid
-  double err = gangle - adjuster;
+  double err = usedAngle - adjuster;
   pid_i += igain * err;
   const double pid_p = pgain * err;
   double output = pid_p + pid_i + dgain * (err - pidde);
@@ -195,12 +186,12 @@ void loop(){ ///////////////////////////////////////////////////////////////////
 
   pidde = err;
 
-  if (output < 5 && output > -5)
-  {
-    output = 0;
-  }
+  // if (output < 3 && output > -3)
+  // {
+  //   output = 0;
+  // }
 
-  if (gangle < -30 || gangle > 30 || balance == 0)
+  if (usedAngle < -30 || usedAngle > 30 || balance == 0)
   {
     output = 0;
     pid_i = 0;
@@ -214,10 +205,10 @@ void loop(){ ///////////////////////////////////////////////////////////////////
   delay(20);
   //*/
 
-  if (output < 0)
-    adjuster += 0.015;
-  if (output > 0)
-    adjuster -= 0.015;
+  // if (output < 0)
+  //   adjuster += 0.015;
+  // if (output > 0)
+  //   adjuster -= 0.015;
 
   double motl = calc_mot(output);
   double motr = motl; // calc_mot(output);
