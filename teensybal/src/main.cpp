@@ -15,12 +15,12 @@ const int n_samples = 1000;
 const double balance_window = 0.5;
 
 // microseconds before next pid tick
-const int loop_time_length = 4000;
+const int loop_time_length = 2000;
 
 // pid params
-constexpr double pgain = 50;//15;
-constexpr double igain = 5;//.5;//1.5; 
-constexpr double dgain = -35;//45;//10;
+constexpr double pgain = 25;//15;
+constexpr double igain = 0;//.5;//1.5; 
+constexpr double dgain = -45;//45;//10;
 
 //moving average filter setup
 const int points = 1;
@@ -65,7 +65,7 @@ void setup(){  /////////////////////////////////////////////////////////////////
   pinMode(6, OUTPUT);
   pinMode(7, OUTPUT);
   pinMode(13, OUTPUT);
-
+  PORTD &= ~(1<<6);
   // configure device
   Wire.beginTransmission(lsm);
   Wire.write(CTRL_REG1_G);
@@ -90,7 +90,7 @@ void setup(){  /////////////////////////////////////////////////////////////////
     delayMicroseconds(3000);
   }
   y_g_calibration /= n_samples;
-  loop_time = micros() + 4000;
+  loop_time = micros() + loop_time_length;
 
   for (int i=0; i < points; i++){
     readArray[i] =0;
@@ -118,6 +118,7 @@ void loop(){ ///////////////////////////////////////////////////////////////////
   int16_t ax_value = (raxh << 8) | raxl;
   //Serial.println(ax_value);
   double ax = -ax_value/8200.0;
+  ax = ax + 0.01;
   if (ax > 1.0) {
     ax = 1.0;
   }
@@ -157,6 +158,12 @@ void loop(){ ///////////////////////////////////////////////////////////////////
     balance = 1;
   }
 
+  //enable motors only when balancing to save battery
+  if(balance == 1){
+    PORTD &= ~(1<<6);
+  }
+  else PORTD |= (1<<6);
+
   gangle += gy * 0.000031;
   gangle = gangle * 0.9996 + aangle * 0.0004;
 
@@ -172,17 +179,20 @@ void loop(){ ///////////////////////////////////////////////////////////////////
 
 
   double usedAngle = gangle;
-  //double usedAngle = movingAvg;
+//  double usedAngle = movingAvg;
+
   //pid
   double err = usedAngle - adjuster;
   pid_i += igain * err;
   const double pid_p = pgain * err;
-  double output = pid_p + pid_i + dgain * (err - pidde);
+  double pid_d = dgain * (err - pidde);
+  
+  double output = pid_p + pid_i + pid_d;
 
-  if (output > 500)
-    output = 500;
-  else if (output < -500)
-    output = -500;
+  // if (output > 1800)
+  //   output = 1800;
+  // else if (output < -1800)
+  //   output = -1800;
 
   pidde = err;
 
@@ -191,7 +201,7 @@ void loop(){ ///////////////////////////////////////////////////////////////////
   //   output = 0;
   // }
 
-  if (usedAngle < -30 || usedAngle > 30 || balance == 0)
+  if (gangle < -30 || gangle > 30 || balance == 0)
   {
     output = 0;
     pid_i = 0;
