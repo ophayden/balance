@@ -2,7 +2,10 @@
 
 #include <math.h>
 #include <Wire.h>
+
 #include <regsNpins.h>
+#include <newdecs.h>
+#include <isr.h>
 
 IntervalTimer myTimer;
 void myISR();
@@ -20,7 +23,7 @@ const int loop_time_length = 2000;
 // pid params
 constexpr double pgain = 25;//15;
 constexpr double igain = 0;//.5;//1.5; 
-constexpr double dgain = -45;//45;//10;
+constexpr double dgain = 0;//45;//10;
 
 //moving average filter setup
 const int points = 1;
@@ -37,13 +40,14 @@ constexpr double to_deg = 180.0 / M_PI;
 
 double gangle, adjuster, pid_i, pidde, y_g_calibration, output;
 byte balance;
+/*
 int stepr = 0,
     pulsecountr = 0,
     pulsememr = 0;
 int stepl = 0,
     pulsecountl = 0,
     pulsememl = 0;
-
+*/
 unsigned long loop_time;
 
 void toggleBlink();
@@ -196,10 +200,10 @@ void loop(){ ///////////////////////////////////////////////////////////////////
 
   pidde = err;
 
-  // if (output < 3 && output > -3)
-  // {
-  //   output = 0;
-  // }
+  if (output < 3 && output > -3)
+  {
+    output = 0;
+  }
 
   if (gangle < -30 || gangle > 30 || balance == 0)
   {
@@ -229,7 +233,7 @@ void loop(){ ///////////////////////////////////////////////////////////////////
   interrupts();
 
 }
-
+/*
 inline double calc_mot(double output) {
   double mot;
 
@@ -298,3 +302,4 @@ void myISR()
   //PORTD &= ~(1<<6);
 }
 
+*/
