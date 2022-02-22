@@ -1,7 +1,10 @@
+//#define newboy 
+//#define oldboy
 #include <Arduino.h>
 
 #include <math.h>
 #include <Wire.h>
+#include <Entropy.h>
 
 #include <regsNpins.h>
 #include <newdecs.h>
@@ -17,13 +20,13 @@ const int n_samples = 1000;
 // If the angle is whithin this window, then start balancing
 const double balance_window = 0.5;
 
-// microseconds before next pid tick
+// loop time in microseconds
 const int loop_time_length = 2000;
 
-// pid params
-constexpr double pgain = 25;//15;
-constexpr double igain = 0;//.5;//1.5; 
-constexpr double dgain = 0;//45;//10;
+// pid params-- These are the weighting coefficients for each term in the pid algorithm
+constexpr double gain_p = 72;//15;
+constexpr double gain_i = 0;//19;//.5;//1.5; 
+constexpr double gain_d = 0;//1;//45;//10;
 
 //moving average filter setup
 const int points = 1;
@@ -53,7 +56,7 @@ unsigned long loop_time;
 void toggleBlink();
 double calc_mot(double output);
 
-void setup(){  ////////////////////////////////////////////////////////////////////////
+void setup(){  //setupsetupsetupsetupsetupsetupsetupsetupsetupsetupsetupsetupsetupsetupsetupsetupsetupsetupsetupsetupsetupsetupsetupsetupsetupsetup
   Serial.begin(9600);
   Serial1.begin(9600);
   Wire.begin();
@@ -101,7 +104,7 @@ void setup(){  /////////////////////////////////////////////////////////////////
   }
 }
 
-void loop(){ //////////////////////////////////////////////////////////////////////
+void loop(){ //looplooplooplooplooplooplooplooplooplooplooplooplooplooplooplooplooplooplooplooplooplooplooplooplooplooplooplooplooplooplooploop
   if(serialCounter >= serialSpacer){
     serialCounter = 0;
   }
@@ -171,7 +174,7 @@ void loop(){ ///////////////////////////////////////////////////////////////////
   gangle += gy * 0.000031;
   gangle = gangle * 0.9996 + aangle * 0.0004;
 
-  //implement moving average
+  //calculate moving average
   sum = sum - readArray[readIndex];
   readArray[readIndex] = gangle;
   sum = sum + readArray[readIndex];
@@ -181,25 +184,25 @@ void loop(){ ///////////////////////////////////////////////////////////////////
   }
   movingAvg = sum/points;
 
-
+  //use moving average
   double usedAngle = gangle;
 //  double usedAngle = movingAvg;
 
-  //pid
+  //pid/////////////////////////////////////////////////////////////////////////////
   double err = usedAngle - adjuster;
-  pid_i += igain * err;
-  const double pid_p = pgain * err;
-  double pid_d = dgain * (err - pidde);
+  pid_i += gain_i * err;
+  const double pid_p = gain_p * err;
+  double pid_d = gain_d * (err - pidde);
   
   double output = pid_p + pid_i + pid_d;
-
-  // if (output > 1800)
-  //   output = 1800;
-  // else if (output < -1800)
-  //   output = -1800;
+  //////////////////////////////////////////////////////////////////////////////////
+  if (output > 1800)
+    output = 1800;
+  else if (output < -1800)
+    output = -1800;
 
   pidde = err;
-
+  
   if (output < 3 && output > -3)
   {
     output = 0;
@@ -233,73 +236,3 @@ void loop(){ ///////////////////////////////////////////////////////////////////
   interrupts();
 
 }
-/*
-inline double calc_mot(double output) {
-  double mot;
-
-  if (output > 0)
-    output = 203 - 2750 / (output + 9);
-  else if (output < 0)
-    output = -203 - 2750 / (output - 9);
-
-  if (output > 0)
-    mot = 200 - output;
-  else if (output < 0)
-    mot = -200 - output;
-  else
-    mot = 0;
-  return mot;
-}
-
-inline void toggleBlink() {
-  const auto &currentValue = digitalRead(LED_PIN);
-  digitalWrite(LED_PIN, !currentValue);
-}
-
-void myISR()
-{
-  //PORTD |= (1<<6);
-  pulsecountl++;
-  if (pulsecountl > pulsememl)
-  {
-    pulsecountl = 0;
-    pulsememl = stepl;
-    if (pulsememl < 0)
-    {
-      PORTD &= ~(1 << dir_pin_l);
-      //PORTD |= 0b00001000;
-      pulsememl *= -1;
-    }
-    else
-      PORTD |= (1 << dir_pin_l);
-    //else PORTD &= 0b11110111;
-  }
-  else if (pulsecountl == 1)
-    PORTD |= (1 << step_pin_l);
-  else if (pulsecountl == step_pin_l)
-    PORTD &= ~(1 << 2);
-
-  //right motor pulse calculations
-  pulsecountr++;
-  if (pulsecountr > pulsememr)
-  {
-    pulsecountr = 0;
-    pulsememr = stepr;
-    if (pulsememr < 0)
-    {
-      PORTD |= (1<<dir_pin_r);
-      //PORTD &= 0b11011111;
-      pulsememr *= -1;
-    }
-    else
-      PORTD &= ~(1<<dir_pin_r);
-    //else PORTD |= 0b00100000;
-  }
-  else if (pulsecountr == 1)
-    PORTD |= (1<<step_pin_r);
-  else if (pulsecountr == 2)
-    PORTD &= ~(1<<step_pin_r);
-  //PORTD &= ~(1<<6);
-}
-
-*/

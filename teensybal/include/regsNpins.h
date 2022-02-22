@@ -1,7 +1,17 @@
-#define step_pin_l 2
-#define dir_pin_l 3
-#define step_pin_r 4
-#define dir_pin_r 5
+// #ifdef oldboy
+// #define step_pin_l 2
+// #define dir_pin_l 3
+// #define step_pin_r 4
+// #define dir_pin_r 5
+// #endif
+
+//#ifdef newboy
+#define step_pin_l 1
+#define dir_pin_l 2
+#define step_pin_r 3
+#define dir_pin_r 4
+//#endif
+
 // REGISTER PORTS
 #define lsm 0x6B
 #define LED_PIN 13

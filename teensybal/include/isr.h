@@ -25,8 +25,8 @@ void myISR()
   }
   else if (pulsecountl == 1)
     PORTD |= (1 << step_pin_l);
-  else if (pulsecountl == step_pin_l)
-    PORTD &= ~(1 << 2);
+  else if (pulsecountl == 2)
+    PORTD &= ~(1 << step_pin_l);
 
   //right motor pulse calculations
   pulsecountr++;
